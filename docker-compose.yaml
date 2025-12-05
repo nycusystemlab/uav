@@ -1,27 +1,32 @@
 services:
   drone-cam:
-    # 直接使用 OSRF 官方的 ROS 2 Humble 映像檔
-    # 不需要用 dustynv 或 NVIDIA 的 l4t 版本 (因為沒 GPU 可用)
-    image: osrf/ros:humble-desktop
+    # 修改 1: 必須使用支援 Jetson Nano (L4T R32.7.1 / JetPack 4.6) 的 Humble 映像檔
+    # 這是 dustynv 專為 Nano 編譯的版本，解決了 Kernel 4.9 與 Humble 的相容性問題
+    image: dustynv/ros:humble-desktop-l4t-r32.7.1
+    
     container_name: drone_camera
     
-    # 關鍵：使用 Host 網路，讓您的 AGX 能直接掃到它
+    # 修改 2: 雖然你說沒 GPU，但在 Nano 上掛載 runtime: nvidia 
+    # 有助於解決 USB 裝置存取權限與底層驅動對應問題 (即使只用 CPU)
+    runtime: nvidia
+    
     network_mode: host
     ipc: host
     restart: always
 
-    # 權限：讓容器讀取 USB 攝影機
     devices:
       - /dev/video0:/dev/video0
+    
+    # 在某些 Nano 設定中，開啟 privileged 有助於解決 V4L2 存取問題
     privileged: true
 
-    # 環境變數
     environment:
-      - ROS_DOMAIN_ID=0  # 注意：必須跟您的 AGX 設定一樣
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp # 建議：指定 DDS 以防衝突 (選配)
+      - ROS_DOMAIN_ID=0
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      # 修正顯示相關錯誤 (Headless 模式不需要 DISPLAY，但桌面版 image 可能會跳 warning)
+      - DISPLAY=:0 
 
-    # 啟動指令：發布壓縮影像 (節省頻寬)
-    # 使用 image_tools 的 cam2image 節點，簡單好用
+    # 啟動指令
     command: >
       ros2 run image_tools cam2image
       --ros-args
