@@ -1,0 +1,33 @@
+services:
+  drone-cam:
+    # 直接使用 OSRF 官方的 ROS 2 Humble 映像檔
+    # 不需要用 dustynv 或 NVIDIA 的 l4t 版本 (因為沒 GPU 可用)
+    image: osrf/ros:humble-desktop
+    container_name: drone_camera
+    
+    # 關鍵：使用 Host 網路，讓您的 AGX 能直接掃到它
+    network_mode: host
+    ipc: host
+    restart: always
+
+    # 權限：讓容器讀取 USB 攝影機
+    devices:
+      - /dev/video0:/dev/video0
+    privileged: true
+
+    # 環境變數
+    environment:
+      - ROS_DOMAIN_ID=0  # 注意：必須跟您的 AGX 設定一樣
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp # 建議：指定 DDS 以防衝突 (選配)
+
+    # 啟動指令：發布壓縮影像 (節省頻寬)
+    # 使用 image_tools 的 cam2image 節點，簡單好用
+    command: >
+      ros2 run image_tools cam2image
+      --ros-args
+      -p device_id:=0
+      -p width:=640
+      -p height:=480
+      -p frequency:=15.0
+      -p burger_mode:=false
+      -r /image:=/drone/image_raw
